@@ -1,6 +1,7 @@
 const Sequelize = require("sequelize");
 const { STRING } = Sequelize;
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const config = {
   logging: false,
@@ -17,6 +18,10 @@ const conn = new Sequelize(
 const User = conn.define("user", {
   username: STRING,
   password: STRING,
+});
+
+User.addHook("beforeCreate", async (user) => {
+  user.password = await bcrypt.hash(user.password, 5);
 });
 
 User.byToken = async (token) => {
@@ -40,10 +45,10 @@ User.authenticate = async ({ username, password }) => {
   const user = await User.findOne({
     where: {
       username,
-      password,
     },
   });
-  if (user) {
+  const trueOrFalse = await bcrypt.compare(user.password, password);
+  if (user && trueOrFalse) {
     return jwt.sign({ id: user.id }, process.env.JWT);
   }
   const error = Error("bad credentials");
